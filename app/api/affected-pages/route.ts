@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { errorResponse, parseJsonBody } from "@/lib/api-helpers";
 import {
   AffectedPageSchema,
   AffectedPagesQuerySchema,
@@ -12,22 +11,12 @@ import { AFFECTED_PAGES_QUERY, buildAffectedPagesParams } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
-type ErrorBody = { error: string; details?: unknown };
-
 type RawAffectedPage = {
   route?: unknown;
   filePath?: unknown;
   reasons?: unknown;
   symbols?: unknown;
 };
-
-async function parseJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error("Invalid JSON body");
-  }
-}
 
 function normalizeAffectedPage(value: unknown): AffectedPage | null {
   const item = value as RawAffectedPage;
@@ -55,7 +44,7 @@ function normalizeAffectedPage(value: unknown): AffectedPage | null {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const raw = await parseJson(request);
+    const raw = await parseJsonBody(request);
     const input = AffectedPagesQuerySchema.parse(raw);
     const params = buildAffectedPagesParams(input);
 
@@ -71,18 +60,6 @@ export async function POST(request: Request): Promise<Response> {
     const payload: AffectedPagesResponse = AffectedPagesResponseSchema.parse({ pages });
     return Response.json(payload);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      const body: ErrorBody = {
-        error: "Validation failed",
-        details: error.issues,
-      };
-      return Response.json(body, { status: 400 });
-    }
-
-    const body: ErrorBody = {
-      error: error instanceof Error ? error.message : "Unknown server error",
-    };
-
-    return Response.json(body, { status: 500 });
+    return errorResponse(error);
   }
 }

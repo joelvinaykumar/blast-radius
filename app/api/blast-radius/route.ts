@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { errorResponse, parseJsonBody } from "@/lib/api-helpers";
 import {
   BlastEdgeSchema,
   BlastNodeSchema,
@@ -14,16 +13,6 @@ import { buildBlastRadiusQuery } from "@/lib/queries";
 
 export const runtime = "nodejs";
 
-type ErrorBody = { error: string; details?: unknown };
-
-async function parseJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error("Invalid JSON body");
-  }
-}
-
 function normalizeNode(value: unknown): BlastNode | null {
   const parsed = BlastNodeSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
@@ -36,7 +25,7 @@ function normalizeEdge(value: unknown): BlastEdge | null {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const raw = await parseJson(request);
+    const raw = await parseJsonBody(request);
     const input = BlastRadiusQuerySchema.parse(raw);
     const built = buildBlastRadiusQuery(input);
 
@@ -74,18 +63,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json(payload);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      const body: ErrorBody = {
-        error: "Validation failed",
-        details: error.issues,
-      };
-      return Response.json(body, { status: 400 });
-    }
-
-    const body: ErrorBody = {
-      error: error instanceof Error ? error.message : "Unknown server error",
-    };
-
-    return Response.json(body, { status: 500 });
+    return errorResponse(error);
   }
 }

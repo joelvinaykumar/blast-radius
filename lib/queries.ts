@@ -121,3 +121,31 @@ export function buildAffectedPagesParams(params: AffectedPagesParams): {
     changedFiles: Array.from(new Set(params.changedFiles.filter(Boolean))),
   };
 }
+
+export const SYMBOL_SEARCH_LIMIT = 5;
+
+export const SYMBOL_SEARCH_QUERY = `
+  MATCH (repo:Repository {id: $repoId})-[:HAS_SYMBOL]->(symbol:Symbol)
+  WITH symbol, toLower($query) AS searchTerm
+  WHERE toLower(coalesce(symbol.fqn, symbol.id, symbol.name, "")) CONTAINS searchTerm
+     OR toLower(coalesce(symbol.name, "")) CONTAINS searchTerm
+     OR toLower(coalesce(symbol.filePath, "")) CONTAINS searchTerm
+  RETURN {
+    symbol: coalesce(symbol.fqn, symbol.id, symbol.name),
+    label: coalesce(symbol.name, '') + CASE WHEN symbol.filePath IS NOT NULL THEN ' / ' + symbol.filePath ELSE '' END,
+    filePath: symbol.filePath
+  } AS result
+  ORDER BY result.symbol ASC
+  LIMIT $limit
+`;
+
+export function buildSymbolSearchParams(params: {
+  repoId: string;
+  query: string;
+}): { repoId: string; query: string; limit: number } {
+  return {
+    repoId: params.repoId,
+    query: params.query.trim(),
+    limit: SYMBOL_SEARCH_LIMIT,
+  };
+}

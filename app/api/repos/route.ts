@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { errorResponse, parseJsonBody } from "@/lib/api-helpers";
 import {
   CreateRepoRequestSchema,
   CreateRepoResponseSchema,
@@ -10,24 +9,14 @@ import {
 import {
   deleteIngestedRepositoryById,
   listIngestedRepositories,
-} from "@/lib/ingest-pipeline";
+} from "@/lib/repo-queries";
 import { createIngestJob } from "@/worker/job-manager";
 
 export const runtime = "nodejs";
 
-type ErrorBody = { error: string; details?: unknown };
-
-async function parseJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error("Invalid JSON body");
-  }
-}
-
 export async function POST(request: Request): Promise<Response> {
   try {
-    const raw = await parseJson(request);
+    const raw = await parseJsonBody(request);
     const input = CreateRepoRequestSchema.parse(raw);
 
     const job = createIngestJob({
@@ -42,19 +31,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json(payload, { status: 202 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      const body: ErrorBody = {
-        error: "Validation failed",
-        details: error.issues,
-      };
-      return Response.json(body, { status: 400 });
-    }
-
-    const body: ErrorBody = {
-      error: error instanceof Error ? error.message : "Unknown server error",
-    };
-
-    return Response.json(body, { status: 500 });
+    return errorResponse(error);
   }
 }
 
@@ -69,11 +46,7 @@ export async function GET(request: Request): Promise<Response> {
 
     return Response.json(payload);
   } catch (error) {
-    const body: ErrorBody = {
-      error: error instanceof Error ? error.message : "Unknown server error",
-    };
-
-    return Response.json(body, { status: 500 });
+    return errorResponse(error);
   }
 }
 
@@ -93,10 +66,6 @@ export async function DELETE(request: Request): Promise<Response> {
 
     return Response.json({ success: true });
   } catch (error) {
-    const body: ErrorBody = {
-      error: error instanceof Error ? error.message : "Unknown server error",
-    };
-
-    return Response.json(body, { status: 500 });
+    return errorResponse(error);
   }
 }

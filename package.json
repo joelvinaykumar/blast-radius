@@ -9,6 +9,7 @@
     "lint": "eslint",
     "check:neo4j": "tsx scripts/check-neo4j.ts",
     "ingest:repo": "tsx scripts/ingest-repo.ts",
+    "seed": "tsx scripts/ingest-repo.ts https://github.com/joelvinaykumar/blast-radius.git main",
     "test:job": "tsx scripts/test-job-lifecycle.ts"
   },
   "dependencies": {

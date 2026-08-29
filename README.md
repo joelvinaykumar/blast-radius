@@ -1,6 +1,8 @@
 # Blast Radius
 
-Ingest a TypeScript/React repository into a Neo4j graph, then query **blast radius**, **shared dependencies**, **affected pages**, and export an **AI-ready prompt** — all from a single-page UI.
+> **Live →** [blast-radius-two.vercel.app](https://blast-radius-two.vercel.app/)
+
+Ingest a TypeScript/React repository into a Neo4j graph, then query **blast radius**, **affected pages**, and export an **AI-ready prompt** — all from a single-page UI.
 
 ## Data Model
 
@@ -20,7 +22,6 @@ Ingest a TypeScript/React repository into a Neo4j graph, then query **blast radi
 │  │ Flow     │  │  DELETE /api/repos            │  │
 │  │          │  │  GET  /api/jobs/{id}          │  │
 │  │          │  │  POST /api/blast-radius       │  │
-│  │          │  │  POST /api/shared-deps        │  │
 │  │          │  │  POST /api/affected-pages     │  │
 │  │          │  │  GET  /api/symbol-search      │  │
 │  └──────────┘  └──────────┬───────────────────┘  │

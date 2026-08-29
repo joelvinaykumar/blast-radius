@@ -94,7 +94,8 @@ export function ReposSection(props: ReposSectionProps): React.JSX.Element {
                       aria-label={`Open options for ${repo.repoName}`}
                       title="More options"
                       onClick={() => onToggleRepoMenu(repo.repoId)}
-                      className="rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-100"
+                      disabled={isDeletePending}
+                      className="rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <EllipsisVerticalIcon className="h-3.5 w-3.5" />
                     </button>
@@ -104,7 +105,8 @@ export function ReposSection(props: ReposSectionProps): React.JSX.Element {
                         <button
                           type="button"
                           onClick={() => onMakeRepoCurrent(repo)}
-                          className="w-full rounded px-2 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                          disabled={isDeletePending}
+                          className="w-full rounded px-2 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Make repo current
                         </button>
