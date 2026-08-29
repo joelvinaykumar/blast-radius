@@ -2,6 +2,10 @@
 
 Ingest a TypeScript/React repository into a Neo4j graph, then query **blast radius**, **shared dependencies**, **affected pages**, and export an **AI-ready prompt** — all from a single-page UI.
 
+## Data Model
+
+![Neo4j Graph Data Model](/public/data-model-diagram.png)
+
 ## Architecture
 
 ```
