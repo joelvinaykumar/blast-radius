@@ -1,0 +1,581 @@
+openapi: 3.1.0
+info:
+  title: Blast Radius API
+  version: 0.1.0
+  description: |
+    API surface for repository ingestion and blast-radius graph analysis.
+    All endpoints are implemented via Next.js App Router Route Handlers.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Ingestion Jobs
+    description: Create and monitor repository ingestion jobs.
+  - name: Graph Queries
+    description: Query blast radius and impact data from the Neo4j/Cognodb graph.
+
+paths:
+  /api/repos:
+    get:
+      tags: [Ingestion Jobs]
+      summary: List already ingested repositories
+      description: Returns recent repositories already dumped into the graph so clients can reuse existing data.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        '200':
+          description: Repository list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestedReposResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Ingestion Jobs]
+      summary: Create a repository ingestion job
+      description: Enqueues a background job to clone, parse, and write a repository graph.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRepoRequest'
+            examples:
+              gitRemote:
+                value:
+                  repoUrl: https://github.com/vercel/next.js.git
+                  branch: canary
+              localFileUri:
+                value:
+                  repoUrl: file:///Users/you/projects/blast-radius
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRepoResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Ingestion Jobs]
+      summary: Delete an ingested repository
+      description: Permanently deletes repository graph data (repository, files, symbols, and related edges).
+      parameters:
+        - name: repoId
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Repository deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+                    const: true
+        '400':
+          description: Missing repoId query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/jobs/{id}:
+    get:
+      tags: [Ingestion Jobs]
+      summary: Get ingestion job status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/blast-radius:
+    post:
+      tags: [Graph Queries]
+      summary: Query blast radius for a symbol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlastRadiusQuery'
+            example:
+              repoId: c409264826ae1be737a370bf
+              symbol: c409264826ae1be737a370bf:app/page.tsx#module
+              maxDepth: 2
+      responses:
+        '200':
+          description: Blast radius graph payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlastRadiusResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/affected-pages:
+    post:
+      tags: [Graph Queries]
+      summary: Find affected pages from changed files
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AffectedPagesQuery'
+            example:
+              repoId: c409264826ae1be737a370bf
+              changedFiles:
+                - app/layout.tsx
+      responses:
+        '200':
+          description: Affected pages list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AffectedPagesResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/shared-deps:
+    post:
+      tags: [Graph Queries]
+      summary: Find shared dependencies between symbols
+      description: Given two or more symbol FQNs, returns dependencies they share.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SharedDepsQuery'
+            example:
+              repoId: c409264826ae1be737a370bf
+              symbols:
+                - "c409264826ae1be737a370bf:app/page.tsx#module"
+                - "c409264826ae1be737a370bf:app/layout.tsx#module"
+      responses:
+        '200':
+          description: Shared dependencies list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedDepsResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/symbol-search:
+    get:
+      tags: [Graph Queries]
+      summary: Search symbols in a repository
+      description: Case-insensitive search across symbol FQN, name, and file path. Returns at most 5 results.
+      parameters:
+        - name: repoId
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 300
+      responses:
+        '200':
+          description: Symbol search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SymbolSearchResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Unexpected server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    JobStatus:
+      type: string
+      enum: [queued, cloning, parsing, writing_graph, ready, failed]
+
+    CreateRepoRequest:
+      type: object
+      required: [repoUrl]
+      properties:
+        repoUrl:
+          type: string
+          format: uri
+          description: Repository URL. Accepts git remotes and file:// local URIs.
+        branch:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    CreateRepoResponse:
+      type: object
+      required: [jobId, status]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/JobStatus'
+
+    IngestResult:
+      type: object
+      required: [repoId, repoName, branch, parsedFiles, parsedSymbols, parsedDependencies]
+      properties:
+        repoId:
+          type: string
+        repoName:
+          type: string
+        branch:
+          type: string
+        parsedFiles:
+          type: integer
+          minimum: 0
+        parsedSymbols:
+          type: integer
+          minimum: 0
+        parsedDependencies:
+          type: integer
+          minimum: 0
+
+    IngestedRepoSummary:
+      type: object
+      required: [repoId, repoUrl, repoName, branch, ingestedAt, parsedFiles, parsedSymbols, parsedDependencies]
+      properties:
+        repoId:
+          type: string
+        repoUrl:
+          type: string
+          description: Stored repository source (may be URL or local path from earlier ingestions).
+        repoName:
+          type: string
+        branch:
+          type: string
+        ingestedAt:
+          type: string
+          format: date-time
+        parsedFiles:
+          type: integer
+          minimum: 0
+        parsedSymbols:
+          type: integer
+          minimum: 0
+        parsedDependencies:
+          type: integer
+          minimum: 0
+
+    IngestedReposResponse:
+      type: object
+      required: [repositories]
+      properties:
+        repositories:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestedRepoSummary'
+
+    JobStatusResponse:
+      type: object
+      required: [jobId, status, repoUrl, startedAt, completedAt, error, result]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        repoUrl:
+          type: string
+          description: Source used for ingestion (URI or legacy local path).
+        startedAt:
+          type: [string, 'null']
+          format: date-time
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        error:
+          type: [string, 'null']
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/IngestResult'
+            - type: 'null'
+
+    BlastRadiusQuery:
+      type: object
+      required: [repoId, symbol]
+      properties:
+        repoId:
+          type: string
+          minLength: 1
+        symbol:
+          type: string
+          minLength: 1
+        maxDepth:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 3
+
+    BlastNode:
+      type: object
+      required: [id, label, kind, filePath, score]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        kind:
+          type: string
+        filePath:
+          type: [string, 'null']
+        score:
+          type: [number, 'null']
+
+    BlastEdge:
+      type: object
+      required: [id, source, target, type]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        type:
+          type: string
+
+    BlastRadiusResponse:
+      type: object
+      required: [nodes, edges, impactedFileCount, impactedSymbolCount]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlastNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlastEdge'
+        impactedFileCount:
+          type: integer
+          minimum: 0
+        impactedSymbolCount:
+          type: integer
+          minimum: 0
+
+    AffectedPagesQuery:
+      type: object
+      required: [repoId, changedFiles]
+      properties:
+        repoId:
+          type: string
+          minLength: 1
+        changedFiles:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: string
+            minLength: 1
+
+    AffectedPage:
+      type: object
+      required: [route, filePath, reasons]
+      properties:
+        route:
+          type: string
+        filePath:
+          type: string
+        reasons:
+          type: array
+          items:
+            type: string
+
+    AffectedPagesResponse:
+      type: object
+      required: [pages]
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AffectedPage'
+
+    SharedDepsQuery:
+      type: object
+      required: [repoId, symbols]
+      properties:
+        repoId:
+          type: string
+          minLength: 1
+        symbols:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+
+    SharedDependency:
+      type: object
+      required: [dependencyName, consumers, consumerCount]
+      properties:
+        dependencyName:
+          type: string
+        consumers:
+          type: array
+          items:
+            type: string
+        consumerCount:
+          type: integer
+          minimum: 0
+
+    SharedDepsResponse:
+      type: object
+      required: [sharedDependencies]
+      properties:
+        sharedDependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/SharedDependency'
+
+    SymbolSearchItem:
+      type: object
+      required: [symbol, label, filePath]
+      properties:
+        symbol:
+          type: string
+        label:
+          type: string
+        filePath:
+          type: [string, 'null']
+
+    SymbolSearchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/SymbolSearchItem'
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    ValidationIssue:
+      type: object
+      additionalProperties: true
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            details:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValidationIssue'
